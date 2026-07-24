@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instagram Scraper - Options</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f5f6fa;
+      color: #2d3436;
+      line-height: 1.6;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      opacity: 0.9;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #667eea;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    .setting-label {
+      flex: 1;
+    }
+
+    .setting-label h3 {
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
+    .setting-label p {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .setting-control {
+      min-width: 200px;
+    }
+
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="number"]:focus,
+    select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-danger {
+      background: #ff4757;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #ff3344;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 26px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 26px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: #667eea;
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .stat-card {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: #666;
+      margin-top: 8px;
+    }
+
+    .info-box {
+      background: #e8f4fd;
+      border-left: 4px solid #667eea;
+      padding: 16px;
+      border-radius: 4px;
+      margin-top: 16px;
+    }
+
+    .info-box h4 {
+      color: #667eea;
+      margin-bottom: 8px;
+    }
+
+    .info-box ul {
+      margin-left: 20px;
+      font-size: 13px;
+    }
+
+    .info-box li {
+      margin-bottom: 4px;
+    }
+
+    .message {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .message-success {
+      background: #e0ffe0;
+      color: #27ae60;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📸 Instagram Scraper Pro</h1>
+    <p>Enterprise-grade hashtag data extraction</p>
+  </div>
+
+  <div class="container">
+    <!-- Settings Section -->
+    <div class="section">
+      <h2 class="section-title">Settings</h2>
+      
+      <div class="setting-row">
+        <div class="setting-label">
+          <h3>Max Posts per Hashtag</h3>
+          <p>Maximum number of posts to scrape for each hashtag</p>
+        </div>
+        <div class="setting-control">
+          <input type="number" id="maxPosts" min="100" max="10000" step="100" />
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <h3>Scroll Delay (ms)</h3>
+          <p>Delay between scrolls (higher = more human-like)</p>
+        </div>
+        <div class="setting-control">
+          <input type="number" id="scrollDelay" min="500" max="5000" step="100" />
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <h3>Default Export Format</h3>
+          <p>Choose your preferred export format</p>
+        </div>
+        <div class="setting-control">
+          <select id="exportFormat">
+            <option value="csv">CSV (Excel Compatible)</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">
+          <h3>Auto-Export After Scraping</h3>
+          <p>Automatically export data when scraping completes</p>
+        </div>
+        <div class="setting-control">
+          <label class="toggle-switch">
+            <input type="checkbox" id="autoExport" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="saveBtn" class="btn btn-primary">Save Settings</button>
+        <button id="resetBtn" class="btn btn-danger">Reset to Defaults</button>
+      </div>
+      
+      <div id="saveMessage" class="message message-success" style="display: none;">
+        Settings saved successfully!
+      </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="section">
+      <h2 class="section-title">Database Statistics</h2>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div id="totalPostsStat" class="stat-value">0</div>
+          <div class="stat-label">Total Posts Stored</div>
+        </div>
+        <div class="stat-card">
+          <div id="uniqueHashtagsStat" class="stat-value">0</div>
+          <div class="stat-label">Unique Hashtags</div>
+        </div>
+        <div class="stat-card">
+          <div id="storageSizeStat" class="stat-value">0 MB</div>
+          <div class="stat-label">Storage Used</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="refreshStatsBtn" class="btn btn-primary">Refresh Statistics</button>
+        <button id="clearDataBtn" class="btn btn-danger">Clear All Data</button>
+      </div>
+    </div>
+
+    <!-- Architecture Info -->
+    <div class="section">
+      <h2 class="section-title">Architecture & Best Practices</h2>
+      
+      <div class="info-box">
+        <h4>🏗️ Manifest V3 Compliance</h4>
+        <ul>
+          <li><strong>No infinite loops in background:</strong> Scrolling logic runs in Content Script, not Service Worker</li>
+          <li><strong>State management:</strong> Uses chrome.storage.session for ephemeral state, chrome.storage.local for persistence</li>
+          <li><strong>Offscreen documents:</strong> Heavy CSV/JSON export operations run in isolated offscreen context</li>
+        </ul>
+      </div>
+
+      <div class="info-box" style="margin-top: 16px;">
+        <h4>🌐 Network Interception</h4>
+        <ul>
+          <li><strong>Main World injection:</strong> Fetch/XHR override runs in MAIN world (not isolated content script world)</li>
+          <li><strong>Dynamic endpoint detection:</strong> Uses regex patterns instead of hardcoded URLs to handle API changes</li>
+          <li><strong>Structural parsing:</strong> Identifies hashtag data by JSON structure (edge_hashtag_to_media) not URL paths</li>
+        </ul>
+      </div>
+
+      <div class="info-box" style="margin-top: 16px;">
+        <h4>💾 Database & Deduplication</h4>
+        <ul>
+          <li><strong>IndexedDB with idb:</strong> Promise-based wrapper prevents transaction errors</li>
+          <li><strong>Shortcode as primary key:</strong> Ensures 100% deduplication at database level</li>
+          <li><strong>found_in_hashtags array:</strong> Tracks which hashtags each post appeared in</li>
+        </ul>
+      </div>
+
+      <div class="info-box" style="margin-top: 16px;">
+        <h4>🛡️ Anti-Detection & Circuit Breaker</h4>
+        <ul>
+          <li><strong>Human-like scrolling:</strong> Random delays and scroll amounts mimic real user behavior</li>
+          <li><strong>Circuit breaker pattern:</strong> Pauses after 3 consecutive failures to prevent bans</li>
+          <li><strong>CAPTCHA detection:</strong> Monitors for rate limit messages and challenge pages</li>
+          <li><strong>State recovery:</strong> Saves progress to localStorage for session recovery</li>
+        </ul>
+      </div>
+
+      <div class="info-box" style="margin-top: 16px;">
+        <h4>📊 Memory-Safe Export</h4>
+        <ul>
+          <li><strong>Chunked processing:</strong> Reads 1000 records at a time from IndexedDB</li>
+          <li><strong>Never loads all data:</strong> Prevents Out-Of-Memory crashes on large datasets</li>
+          <li><strong>UTF-8 BOM:</strong> Prepends \uFEFF for proper Excel character encoding</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
