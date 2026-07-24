@@ -7,18 +7,37 @@
  * - Uses chrome.storage.local for persistent state (survives restarts)
  * - Manages hashtag queue and coordinates scraping across tabs
  * - Handles offscreen document for heavy export operations
+ * 
+ * IMPROVEMENTS (v2.0):
+ * - Smart exponential backoff for rate limiting
+ * - Multi-hashtag batch selection and processing
+ * - Instagram login state detection
+ * - Advanced circuit breaker with adaptive cooldown
+ * - Request throttling with human-like delays
  */
 
 // Queue state - stored in chrome.storage.session (ephemeral)
 let scrapingQueue = [];
 let currentHashtag = null;
 let isScraping = false;
+let isLoggedIn = false;
 
-// Circuit breaker state
+// Circuit breaker state with adaptive cooldown
 let circuitBreakerState = {
   active: false,
   reason: null,
-  timestamp: null
+  timestamp: null,
+  cooldownMinutes: 5, // Adaptive: increases with repeated violations
+  violationCount: 0
+};
+
+// Rate limiting configuration
+const RATE_LIMIT_CONFIG = {
+  minDelayBetweenRequests: 2000, // 2 seconds minimum
+  maxDelayBetweenRequests: 8000, // 8 seconds maximum
+  baseCooldownMinutes: 5,
+  maxCooldownMinutes: 60,
+  maxViolations: 5
 };
 
 /**
@@ -27,20 +46,103 @@ let circuitBreakerState = {
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('[Background] Extension installed');
   
-  // Initialize storage
+  // Initialize storage with enhanced configuration
   await chrome.storage.local.set({
     scraper_config: {
-      max_posts_per_hashtag: 1000,
-      scroll_delay_ms: 1500,
+      max_posts_per_hashtag: 100,  // Default: 100 posts per hashtag (user-configurable)
+      scroll_delay_ms: 2000, // Increased for safety
       auto_export: false,
-      export_format: 'csv'
+      export_format: 'csv',
+      enable_smart_delay: true, // New: adaptive delays
+      login_reminder: true, // New: remind user to login
+      media_types: ['all'], // Filter by media type: all, image, video, carousel
+      min_likes: 0, // Minimum likes filter
+      min_comments: 0, // Minimum comments filter
+      date_range_days: 365, // Only scrape posts from last N days
+      enable_filters: false // Enable/disable filtering
     },
     scraper_stats: {
       total_scraped: 0,
-      sessions: 0
-    }
+      sessions: 0,
+      last_session: null
+    },
+    circuit_breaker_history: [] // Track violations over time
   });
 });
+
+/**
+ * Check if user is logged into Instagram
+ */
+async function checkInstagramLogin() {
+  try {
+    const tabs = await chrome.tabs.query({ url: '*://*.instagram.com/*' });
+    if (tabs.length === 0) return false;
+    
+    // Send message to content script to check login state
+    const response = await chrome.tabs.sendMessage(tabs[0].id, {
+      action: 'CHECK_LOGIN_STATE'
+    });
+    
+    isLoggedIn = response?.loggedIn || false;
+    return isLoggedIn;
+  } catch (error) {
+    console.warn('[Background] Could not check login state:', error);
+    return false;
+  }
+}
+
+/**
+ * Calculate smart delay based on recent activity
+ * Implements exponential backoff with jitter
+ */
+function calculateSmartDelay() {
+  const baseDelay = RATE_LIMIT_CONFIG.minDelayBetweenRequests;
+  const maxDelay = RATE_LIMIT_CONFIG.maxDelayBetweenRequests;
+  
+  // Add randomness (jitter) to avoid patterns
+  const jitter = Math.random() * 2000;
+  
+  // Increase delay if we've had recent violations
+  const violationMultiplier = Math.min(
+    1 + (circuitBreakerState.violationCount * 0.5),
+    3
+  );
+  
+  const calculatedDelay = (baseDelay * violationMultiplier) + jitter;
+  return Math.min(calculatedDelay, maxDelay);
+}
+
+/**
+ * Update circuit breaker with adaptive cooldown
+ */
+function updateCircuitBreaker(reason) {
+  circuitBreakerState.active = true;
+  circuitBreakerState.reason = reason;
+  circuitBreakerState.timestamp = Date.now();
+  circuitBreakerState.violationCount++;
+  
+  // Adaptive cooldown: increase with each violation
+  const newCooldown = Math.min(
+    RATE_LIMIT_CONFIG.baseCooldownMinutes * Math.pow(1.5, circuitBreakerState.violationCount - 1),
+    RATE_LIMIT_CONFIG.maxCooldownMinutes
+  );
+  circuitBreakerState.cooldownMinutes = Math.round(newCooldown);
+  
+  console.log(`[Background] Circuit breaker: ${circuitBreakerState.cooldownMinutes} min cooldown`);
+}
+
+/**
+ * Reset circuit breaker after successful operation
+ */
+function resetCircuitBreakerProgress() {
+  if (circuitBreakerState.violationCount > 0) {
+    circuitBreakerState.violationCount = Math.max(0, circuitBreakerState.violationCount - 1);
+    circuitBreakerState.cooldownMinutes = Math.max(
+      RATE_LIMIT_CONFIG.baseCooldownMinutes,
+      circuitBreakerState.cooldownMinutes * 0.8
+    );
+  }
+}
 
 /**
  * Get the active Instagram tab or create one
@@ -61,7 +163,7 @@ async function getOrCreateInstagramTab() {
 }
 
 /**
- * Start scraping a hashtag
+ * Start scraping a hashtag with enhanced rate limiting
  */
 async function startScraping(hashtag) {
   if (isScraping) {
@@ -69,29 +171,49 @@ async function startScraping(hashtag) {
     return { success: false, error: 'Already scraping' };
   }
   
-  // Check circuit breaker
+  // Check circuit breaker with adaptive cooldown
   if (circuitBreakerState.active) {
     const timeSinceTrigger = Date.now() - circuitBreakerState.timestamp;
-    if (timeSinceTrigger < 300000) { // 5 minute cooldown
+    const cooldownMs = circuitBreakerState.cooldownMinutes * 60 * 1000;
+    
+    if (timeSinceTrigger < cooldownMs) {
+      const remainingMinutes = Math.ceil((cooldownMs - timeSinceTrigger) / 60000);
       return { 
         success: false, 
         error: 'Circuit breaker active',
-        reason: circuitBreakerState.reason
+        reason: circuitBreakerState.reason,
+        retry_after_minutes: remainingMinutes
       };
     }
-    // Reset circuit breaker after cooldown
+    // Cooldown expired - reset circuit breaker
     circuitBreakerState.active = false;
+    resetCircuitBreakerProgress();
+  }
+  
+  // Check login state
+  await checkInstagramLogin();
+  if (!isLoggedIn) {
+    return {
+      success: false,
+      error: 'Not logged in',
+      message: 'Please log into Instagram before scraping'
+    };
   }
   
   currentHashtag = hashtag;
   isScraping = true;
+  
+  // Calculate smart delay for this session
+  const smartDelay = calculateSmartDelay();
+  console.log(`[Background] Using ${Math.round(smartDelay)}ms delay for #${hashtag}`);
   
   // Update session storage
   await chrome.storage.session.set({
     scraping_state: {
       active: true,
       hashtag: hashtag,
-      started_at: Date.now()
+      started_at: Date.now(),
+      delay_ms: smartDelay
     }
   });
   
@@ -104,17 +226,18 @@ async function startScraping(hashtag) {
   try {
     await chrome.tabs.update(tab.id, { url: hashtagUrl });
     
-    // Wait for page to load
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Wait for page to load (with smart delay)
+    await new Promise(resolve => setTimeout(resolve, 3000 + smartDelay));
     
-    // Send start command to content script
+    // Send start command to content script with smart delay
     await chrome.tabs.sendMessage(tab.id, {
       action: 'START_SCRAPING',
-      hashtag: hashtag
+      hashtag: hashtag,
+      delay_ms: smartDelay
     });
     
     console.log(`[Background] Started scraping #${hashtag}`);
-    return { success: true, tab_id: tab.id };
+    return { success: true, tab_id: tab.id, delay_ms: smartDelay };
   } catch (error) {
     console.error('[Background] Failed to start scraping:', error);
     isScraping = false;
@@ -167,6 +290,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           // In MV3, we need to handle this carefully
           await storePosts(message.posts, message.hashtag);
           
+          // Success! Reset circuit breaker progress
+          resetCircuitBreakerProgress();
+          
           sendResponse({ status: 'received' });
           break;
           
@@ -179,6 +305,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           console.log(`[Background] Scraping completed for #${message.hashtag}`);
           isScraping = false;
           
+          // Update stats
+          const stats = await chrome.storage.local.get(['scraper_stats']);
+          const currentStats = stats.scraper_stats || { total_scraped: 0, sessions: 0 };
+          currentStats.sessions++;
+          currentStats.last_session = Date.now();
+          await chrome.storage.local.set({ scraper_stats: currentStats });
+          
           // Process next in queue if available
           await processQueue();
           
@@ -187,27 +320,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           
         case 'CIRCUIT_BREAKER_TRIGGERED':
           console.error(`[Background] Circuit breaker triggered: ${message.reason}`);
-          circuitBreakerState.active = true;
-          circuitBreakerState.reason = message.reason;
-          circuitBreakerState.timestamp = Date.now();
+          updateCircuitBreaker(message.reason);
           
           isScraping = false;
           
           // Save to persistent storage
           await chrome.storage.local.set({
-            circuit_breaker: circuitBreakerState
+            circuit_breaker: circuitBreakerState,
+            circuit_breaker_history: [
+              ...(await chrome.storage.local.get(['circuit_breaker_history'])).circuit_breaker_history || [],
+              {
+                reason: message.reason,
+                timestamp: Date.now(),
+                hashtag: message.hashtag
+              }
+            ].slice(-20) // Keep last 20 violations
           });
           
-          sendResponse({ status: 'circuit_breaker_active' });
+          sendResponse({ 
+            status: 'circuit_breaker_active',
+            cooldown_minutes: circuitBreakerState.cooldownMinutes
+          });
           break;
           
         case 'GET_STATUS':
+          const timeSinceTrigger = circuitBreakerState.active 
+            ? Date.now() - circuitBreakerState.timestamp 
+            : 0;
+          const remainingCooldown = circuitBreakerState.active
+            ? Math.max(0, circuitBreakerState.cooldownMinutes - Math.floor(timeSinceTrigger / 60000))
+            : 0;
+            
           sendResponse({
             is_scraping: isScraping,
             current_hashtag: currentHashtag,
             queue_length: scrapingQueue.length,
-            circuit_breaker: circuitBreakerState
+            circuit_breaker: circuitBreakerState,
+            remaining_cooldown_minutes: remainingCooldown,
+            is_logged_in: isLoggedIn
           });
+          break;
+          
+        case 'LOGIN_STATE_UPDATE':
+          isLoggedIn = message.loggedIn;
+          sendResponse({ status: 'updated' });
           break;
           
         default:

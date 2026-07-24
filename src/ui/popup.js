@@ -143,7 +143,7 @@ async function clearQueue() {
 }
 
 /**
- * Update status display
+ * Update status display with enhanced information
  */
 async function updateStatus() {
   try {
@@ -155,6 +155,11 @@ async function updateStatus() {
       currentHashtagDiv.classList.remove('hidden');
       hashtagNameSpan.textContent = '#' + response.current_hashtag;
       
+      // Show login warning if not logged in
+      if (!response.is_logged_in) {
+        showMessage('⚠️ Please log into Instagram to continue scraping', 'error');
+      }
+      
       if (response.circuit_breaker?.active) {
         statusBadge.textContent = 'Paused';
         statusBadge.className = 'status-badge status-warning';
@@ -165,10 +170,22 @@ async function updateStatus() {
       statusBadge.className = 'status-badge status-idle';
       currentHashtagDiv.classList.add('hidden');
       
+      // Check for circuit breaker with countdown
       if (response.circuit_breaker?.active) {
         circuitBreakerWarning.classList.remove('hidden');
+        const remainingMins = response.remaining_cooldown_minutes || 0;
+        
+        if (remainingMins > 0) {
+          document.getElementById('circuitBreakerMessage').textContent = 
+            `⚠️ Scraping paused due to rate limiting. Please wait ${remainingMins} minute(s) before continuing.`;
+        }
       } else {
         circuitBreakerWarning.classList.add('hidden');
+      }
+      
+      // Warn if not logged in
+      if (!response.is_logged_in && response.queue_length > 0) {
+        showMessage('⚠️ You are not logged in. Please log into Instagram first.', 'error');
       }
     }
   } catch (error) {
