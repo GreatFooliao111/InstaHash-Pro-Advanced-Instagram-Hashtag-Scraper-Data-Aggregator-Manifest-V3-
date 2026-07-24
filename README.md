@@ -1,0 +1,2 @@
+# InstaHash-Pro-Advanced-Instagram-Hashtag-Scraper-Data-Aggregator-Manifest-V3-
+A high-performance, enterprise-grade Chrome Extension for extracting Instagram hashtag data via GraphQL network interception. Features smart multi-hashtag aggregation, automatic deduplication, human-like scrolling behavior, and robust CSV/JSON export with full UTF-8 support. Built with Manifest V3 architecture for stability and anti-detection.
