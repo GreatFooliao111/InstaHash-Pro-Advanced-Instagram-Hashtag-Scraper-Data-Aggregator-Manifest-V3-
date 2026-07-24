@@ -1,1 +1,36 @@
-Nothing needs to be added to .gitignore since the changes only include icon image files (.png) which should not be ignored.
+```
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Dependencies
+node_modules/
+.jpm/
+.sass-cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Browser extensions
+*.crx
+*.xpi
+
+# Local configuration
+.local/
+config.local.json
+```
